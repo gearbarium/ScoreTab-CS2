@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ScoreTab CS2 v1",
+  "type": "object",
+  "required": [
+    "version",
+    "teams",
+    "map",
+    "starting_side",
+    "rules",
+    "created_at",
+    "rounds",
+    "revisions",
+    "draft"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "teams": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "$ref": "#/$defs/team"
+      }
+    },
+    "map": {
+      "type": "string"
+    },
+    "starting_side": {
+      "$ref": "#/$defs/side"
+    },
+    "rules": {
+      "$ref": "#/$defs/rules"
+    },
+    "created_at": {
+      "type": "integer"
+    },
+    "rounds": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/round"
+      }
+    },
+    "revisions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/revision"
+      }
+    },
+    "draft": {
+      "$ref": "#/$defs/draft"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "side": {
+      "enum": [
+        "T",
+        "CT"
+      ]
+    },
+    "team": {
+      "type": "object",
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "rules": {
+      "type": "object",
+      "required": [
+        "regulation",
+        "switch_after",
+        "win_target",
+        "overtime_half",
+        "overtime_start"
+      ],
+      "properties": {
+        "regulation": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 200
+        },
+        "switch_after": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 199
+        },
+        "win_target": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 200
+        },
+        "overtime_half": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "overtime_start": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/side"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "draft": {
+      "type": "object",
+      "required": [
+        "winner",
+        "reason",
+        "planted",
+        "site",
+        "note"
+      ],
+      "properties": {
+        "winner": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "Elimination",
+                "Explosion",
+                "Defuse",
+                "Timeout",
+                "Technical"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "planted": {
+          "type": "boolean"
+        },
+        "site": {
+          "anyOf": [
+            {
+              "enum": [
+                "A",
+                "B"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "round": {
+      "type": "object",
+      "required": [
+        "number",
+        "saved_at",
+        "result"
+      ],
+      "properties": {
+        "number": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "saved_at": {
+          "type": "integer"
+        },
+        "result": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/draft"
+            },
+            {
+              "properties": {
+                "winner": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "reason": {
+                  "type": "string"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "revision": {
+      "type": "object",
+      "required": [
+        "before",
+        "after",
+        "saved_at"
+      ],
+      "properties": {
+        "before": {
+          "$ref": "#/$defs/round"
+        },
+        "after": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/round"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "saved_at": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

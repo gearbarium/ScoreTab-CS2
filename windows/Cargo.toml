@@ -1,0 +1,20 @@
+[package]
+name = "scoretab-cs2"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "scoretab-cs2"
+path = "src/main.rs"
+test = false
+
+[dependencies]
+eframe = { version = "0.31.1", default-features = false, features = ["glow", "default_fonts"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+zip = { version = "2.4.2", default-features = false }
+
+[target.'cfg(windows)'.dependencies]
+rfd = { version = "0.15.4", default-features = false }

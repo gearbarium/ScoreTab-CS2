@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "teams": [
+    {
+      "id": 41,
+      "name": "Кривичи"
+    },
+    {
+      "id": 72,
+      "name": "Матрица"
+    }
+  ],
+  "map": "Mirage",
+  "starting_side": "T",
+  "rules": {
+    "regulation": 24,
+    "switch_after": 12,
+    "win_target": 13,
+    "overtime_half": 3,
+    "overtime_start": null
+  },
+  "created_at": 1730000000,
+  "rounds": [
+    {
+      "number": 1,
+      "saved_at": 1730000001,
+      "result": {
+        "winner": 41,
+        "reason": "Explosion",
+        "planted": true,
+        "site": "A",
+        "note": ""
+      }
+    }
+  ],
+  "revisions": [],
+  "draft": {
+    "winner": 72,
+    "reason": "Defuse",
+    "planted": true,
+    "site": "B",
+    "note": "Проверка переноса"
+  }
+}

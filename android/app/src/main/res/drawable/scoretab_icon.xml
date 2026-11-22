@@ -1,0 +1,6 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape><solid android:color="#050B12"/><corners android:radius="16dp"/></shape>
+    </item>
+    <item android:drawable="@drawable/scoretab_emblem" android:gravity="center" android:width="52dp" android:height="52dp"/>
+</layer-list>

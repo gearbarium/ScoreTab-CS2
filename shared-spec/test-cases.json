@@ -1,0 +1,292 @@
+[
+  {
+    "id": "t_win",
+    "winners": [
+      1
+    ],
+    "score": [
+      1,
+      0
+    ],
+    "finished": false,
+    "period": 0,
+    "local": 2,
+    "side": "T",
+    "status_position": 2
+  },
+  {
+    "id": "ct_win",
+    "winners": [
+      2
+    ],
+    "score": [
+      0,
+      1
+    ],
+    "finished": false,
+    "period": 0,
+    "local": 2,
+    "side": "T",
+    "status_position": 2
+  },
+  {
+    "id": "halftime",
+    "winners": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "score": [
+      12,
+      0
+    ],
+    "finished": false,
+    "period": 0,
+    "local": 13,
+    "side": "CT",
+    "status_position": 13
+  },
+  {
+    "id": "custom_halftime",
+    "rules": {
+      "regulation": 8,
+      "switch_after": 3,
+      "win_target": 5,
+      "overtime_half": 2,
+      "overtime_start": null
+    },
+    "winners": [
+      1,
+      2,
+      1
+    ],
+    "score": [
+      2,
+      1
+    ],
+    "finished": false,
+    "period": 0,
+    "local": 4,
+    "side": "CT",
+    "status_position": 4
+  },
+  {
+    "id": "overtime",
+    "winners": [
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2
+    ],
+    "score": [
+      12,
+      12
+    ],
+    "finished": false,
+    "period": 1,
+    "local": 1,
+    "side": "CT",
+    "status_position": 25
+  },
+  {
+    "id": "overtime_switch",
+    "winners": [
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1
+    ],
+    "score": [
+      14,
+      13
+    ],
+    "finished": false,
+    "period": 1,
+    "local": 4,
+    "side": "T",
+    "status_position": 28
+  },
+  {
+    "id": "second_overtime",
+    "winners": [
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2
+    ],
+    "score": [
+      15,
+      15
+    ],
+    "finished": false,
+    "period": 2,
+    "local": 1,
+    "side": "CT",
+    "status_position": 31
+  },
+  {
+    "id": "overtime_win",
+    "winners": [
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      1,
+      1,
+      1
+    ],
+    "score": [
+      16,
+      12
+    ],
+    "finished": true,
+    "period": 1,
+    "local": 4,
+    "side": "T",
+    "status_position": 28
+  },
+  {
+    "id": "no_overtime",
+    "rules": {
+      "regulation": 24,
+      "switch_after": 12,
+      "win_target": 13,
+      "overtime_half": null,
+      "overtime_start": null
+    },
+    "winners": [
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2
+    ],
+    "score": [
+      12,
+      12
+    ],
+    "finished": true,
+    "period": 0,
+    "local": 24,
+    "side": "CT",
+    "status_position": 24
+  }
+]

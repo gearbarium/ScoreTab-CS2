@@ -1,0 +1,68 @@
+[
+  {
+    "side": "T",
+    "reason": "Elimination",
+    "planted": false,
+    "normalized": false
+  },
+  {
+    "side": "T",
+    "reason": "Elimination",
+    "planted": true,
+    "normalized": true
+  },
+  {
+    "side": "T",
+    "reason": "Explosion",
+    "planted": false,
+    "normalized": true
+  },
+  {
+    "side": "CT",
+    "reason": "Defuse",
+    "planted": false,
+    "normalized": true
+  },
+  {
+    "side": "CT",
+    "reason": "Elimination",
+    "planted": true,
+    "normalized": null
+  },
+  {
+    "side": "CT",
+    "reason": "Timeout",
+    "planted": true,
+    "normalized": null
+  },
+  {
+    "side": "CT",
+    "reason": "Timeout",
+    "planted": false,
+    "normalized": false
+  },
+  {
+    "side": "CT",
+    "reason": "Explosion",
+    "planted": false,
+    "normalized": null
+  },
+  {
+    "side": "T",
+    "reason": "Defuse",
+    "planted": false,
+    "normalized": null
+  },
+  {
+    "side": "T",
+    "reason": "Timeout",
+    "planted": false,
+    "normalized": null
+  },
+  {
+    "side": "T",
+    "reason": "Technical",
+    "planted": false,
+    "normalized": null
+  }
+]
