@@ -14,6 +14,11 @@ const RAISED: Color32 = Color32::from_rgb(17, 33, 46);
 const TEXT: Color32 = Color32::from_rgb(241, 247, 251);
 const MUTED: Color32 = Color32::from_rgb(156, 174, 187);
 const OUTLINE: Color32 = Color32::from_rgb(82, 106, 121);
+const ELEVATED: Color32 = Color32::from_rgb(8, 17, 27);
+const HOVER: Color32 = Color32::from_rgb(23, 44, 58);
+const DIVIDER: Color32 = Color32::from_rgb(36, 55, 68);
+const SUCCESS: Color32 = Color32::from_rgb(110, 226, 170);
+const CT: Color32 = Color32::from_rgb(121, 199, 255);
 const FOCUS: Color32 = Color32::from_rgb(255, 209, 132);
 
 fn now() -> i64 {
@@ -79,6 +84,8 @@ struct App {
     path: String,
     export_folder: Option<PathBuf>,
     settings_back: Page,
+    shown_page: Page,
+    page_transition: f64,
     emblem: egui::TextureHandle,
     fullscreen: bool,
 }
@@ -98,27 +105,30 @@ impl App {
 
     fn settings(&mut self, ui: &mut Ui) {
         ui.heading("Настройки");
-        ui.strong("Папка для экспорта");
-        ui.label(self.export_folder.as_ref().map_or_else(
-            || "Папка не выбрана".to_owned(),
-            |path| path.display().to_string(),
-        ));
-        ui.label("CSV, Excel и JSON сохраняются сюда автоматически.");
-        if primary(ui, "Выбрать папку", true) {
-            let mut dialog = rfd::FileDialog::new().set_title("Папка для экспорта ScoreTab CS2");
-            if let Some(folder) = &self.export_folder {
-                dialog = dialog.set_directory(folder);
-            }
-            if let Some(folder) = dialog.pick_folder() {
-                match self.store.set_export_folder(&folder.to_string_lossy()) {
-                    Ok(()) => {
-                        self.export_folder = Some(folder);
-                        self.error.clear();
+        panel(ui, |ui| {
+            ui.strong("Папка для экспорта");
+            ui.label(self.export_folder.as_ref().map_or_else(
+                || "Папка не выбрана".to_owned(),
+                |path| path.display().to_string(),
+            ));
+            ui.label("CSV, Excel и JSON сохраняются сюда автоматически.");
+            if primary(ui, "Выбрать папку", true) {
+                let mut dialog =
+                    rfd::FileDialog::new().set_title("Папка для экспорта ScoreTab CS2");
+                if let Some(folder) = &self.export_folder {
+                    dialog = dialog.set_directory(folder);
+                }
+                if let Some(folder) = dialog.pick_folder() {
+                    match self.store.set_export_folder(&folder.to_string_lossy()) {
+                        Ok(()) => {
+                            self.export_folder = Some(folder);
+                            self.error.clear();
+                        }
+                        Err(error) => self.error = error.to_string(),
                     }
-                    Err(error) => self.error = error.to_string(),
                 }
             }
-        }
+        });
         if ui.button("Назад").clicked() {
             self.page = self.settings_back;
             self.error.clear();
@@ -245,49 +255,64 @@ impl App {
 
     fn setup(&mut self, ui: &mut Ui) {
         ui.heading("Новый матч");
-        for (index, team) in self.setup.teams.iter_mut().enumerate() {
-            ui.label(format!("Команда {}", index + 1));
-            ui.text_edit_singleline(&mut team.name);
-        }
-        ui.horizontal_wrapped(|ui| {
-            ui.label("Начальная сторона команды 1");
-            for side in [Side::T, Side::CT] {
-                ui.selectable_value(&mut self.setup.starting_side, side, format!("{side:?}"));
+        panel(ui, |ui| {
+            ui.strong("Команды и карта");
+            for (index, team) in self.setup.teams.iter_mut().enumerate() {
+                ui.label(format!("Команда {}", index + 1));
+                ui.add(
+                    egui::TextEdit::singleline(&mut team.name)
+                        .desired_width(ui.available_width().min(500.0)),
+                );
+            }
+            ui.horizontal_wrapped(|ui| {
+                ui.label("Начальная сторона команды 1");
+                for side in [Side::T, Side::CT] {
+                    ui.selectable_value(&mut self.setup.starting_side, side, format!("{side:?}"));
+                }
+            });
+            ui.label(format!(
+                "Команда 2 начинает за {:?}",
+                self.setup.starting_side.opposite()
+            ));
+            ui.label("Карта");
+            ui.add(
+                egui::TextEdit::singleline(&mut self.setup.map)
+                    .desired_width(ui.available_width().min(500.0)),
+            );
+        });
+        let rules = &mut self.setup.rules;
+        panel(ui, |ui| {
+            ui.strong("Основное время");
+            number(
+                ui,
+                "Раундов основного времени",
+                &mut rules.regulation,
+                2..=200,
+            );
+            number(
+                ui,
+                "Смена сторон после раунда",
+                &mut rules.switch_after,
+                1..=199,
+            );
+            number(ui, "Побед для завершения", &mut rules.win_target, 2..=200);
+        });
+        panel(ui, |ui| {
+            ui.strong("Овертайм");
+            let mut overtime = rules.overtime_half.is_some();
+            if ui.checkbox(&mut overtime, "Овертайм при ничьей").changed() {
+                rules.overtime_half = overtime.then_some(3);
+            }
+            if let Some(half) = &mut rules.overtime_half {
+                number(ui, "Раундов в половине овертайма", half, 1..=50);
+                ui.horizontal_wrapped(|ui| {
+                    ui.label("Команда 1 начинает овертайм");
+                    ui.selectable_value(&mut rules.overtime_start, None, "Как во второй половине");
+                    ui.selectable_value(&mut rules.overtime_start, Some(Side::T), "T");
+                    ui.selectable_value(&mut rules.overtime_start, Some(Side::CT), "CT");
+                });
             }
         });
-        ui.label(format!(
-            "Команда 2 начинает за {:?}",
-            self.setup.starting_side.opposite()
-        ));
-        ui.label("Карта");
-        ui.text_edit_singleline(&mut self.setup.map);
-        let rules = &mut self.setup.rules;
-        number(
-            ui,
-            "Раундов основного времени",
-            &mut rules.regulation,
-            2..=200,
-        );
-        number(
-            ui,
-            "Смена сторон после раунда",
-            &mut rules.switch_after,
-            1..=199,
-        );
-        number(ui, "Побед для завершения", &mut rules.win_target, 2..=200);
-        let mut overtime = rules.overtime_half.is_some();
-        if ui.checkbox(&mut overtime, "Овертайм при ничьей").changed() {
-            rules.overtime_half = overtime.then_some(3);
-        }
-        if let Some(half) = &mut rules.overtime_half {
-            number(ui, "Раундов в половине овертайма", half, 1..=50);
-            ui.horizontal_wrapped(|ui| {
-                ui.label("Команда 1 начинает овертайм");
-                ui.selectable_value(&mut rules.overtime_start, None, "Как во второй половине");
-                ui.selectable_value(&mut rules.overtime_start, Some(Side::T), "T");
-                ui.selectable_value(&mut rules.overtime_start, Some(Side::CT), "CT");
-            });
-        }
         if primary(ui, "Начать матч", true) {
             self.setup.created_at = now();
             match self.store.insert(&self.setup) {
@@ -303,7 +328,9 @@ impl App {
     fn history(&mut self, ui: &mut Ui) {
         ui.heading("История матчей");
         if self.history.is_empty() {
-            ui.label("Матчей пока нет.");
+            panel(ui, |ui| {
+                ui.label("Сохранённых матчей пока нет.");
+            });
         }
         let mut selected = None;
         for (id, value) in &self.history {
@@ -311,27 +338,45 @@ impl App {
                 continue;
             };
             let [a, b] = progress.score();
-            ui.horizontal_wrapped(|ui| {
-                let date = utc_date(value.created_at);
-                if ui
-                    .button(format!(
-                        "{} {a}:{b} {} · {} · {date} · {}",
-                        value.teams[0].name,
-                        value.teams[1].name,
-                        value.map,
-                        if progress.finished {
+            panel(ui, |ui| {
+                ui.label(
+                    RichText::new(format!(
+                        "{}  ·  {}",
+                        value.teams[0].name, value.teams[1].name
+                    ))
+                    .size(23.0)
+                    .strong(),
+                );
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(
+                        RichText::new(format!("{a}:{b}"))
+                            .size(28.0)
+                            .strong()
+                            .color(AMBER),
+                    );
+                    ui.label(RichText::new(utc_date(value.created_at)).color(MUTED));
+                    if !value.map.is_empty() {
+                        ui.label(&value.map);
+                    }
+                    ui.label(
+                        RichText::new(if progress.finished {
                             "Завершён"
                         } else {
                             "Продолжается"
-                        }
-                    ))
-                    .clicked()
-                {
-                    selected = Some((*id, value.clone()));
-                }
-                if ui.small_button("Удалить").clicked() {
-                    self.confirm = Some(Action::Delete(*id));
-                }
+                        })
+                        .color(if progress.finished {
+                            SUCCESS
+                        } else {
+                            CT
+                        }),
+                    );
+                    if ui.button("Открыть").clicked() {
+                        selected = Some((*id, value.clone()));
+                    }
+                    if ui.small_button("Удалить").clicked() {
+                        self.confirm = Some(Action::Delete(*id));
+                    }
+                });
             });
         }
         if let Some((id, value)) = selected {
@@ -364,8 +409,15 @@ impl App {
             && self.confirm.is_none()
             && ui.input(|input| input.key_pressed(egui::Key::Enter));
         ui.add_space(10.0);
-        if primary(ui, "Следующий раунд", valid.is_ok()) || (keyboard && valid.is_ok())
-        {
+        let (next_round, protocol) = ui
+            .horizontal_wrapped(|ui| {
+                (
+                    primary(ui, "Следующий раунд", valid.is_ok()),
+                    ui.button("Протокол матча").clicked(),
+                )
+            })
+            .inner;
+        if next_round || (keyboard && valid.is_ok()) {
             let previous = value.position(number);
             self.change(|game| {
                 game.draft = draft;
@@ -395,7 +447,7 @@ impl App {
                 Ok(())
             });
         }
-        if ui.button("Протокол матча").clicked() {
+        if protocol {
             self.page = Page::Protocol;
         }
     }
@@ -413,49 +465,64 @@ impl App {
                 ui.ctx().copy_text(protocol_text(value, progress));
             }
         });
-        egui::ScrollArea::horizontal().show(ui, |ui| {
-            egui::Grid::new("rounds")
-                .striped(true)
-                .spacing([16.0, 8.0])
-                .show(ui, |ui| {
-                    for title in [
-                        "Раунд",
-                        "Победитель",
-                        "Сторона",
-                        "Плент",
-                        "Причина",
-                        "Счёт",
-                        "",
-                    ] {
-                        ui.strong(title);
+        if value.rounds.is_empty() {
+            panel(ui, |ui| {
+                ui.label("Завершённые раунды появятся здесь.");
+            });
+        }
+        for (index, round) in value.rounds.iter().enumerate() {
+            let position = value.position(round.number);
+            let section = if index == 0 {
+                Some("Первая половина".to_owned())
+            } else {
+                let previous = value.position(round.number - 1);
+                if position.period != previous.period {
+                    Some(format!("Овертайм {}", position.period))
+                } else if position.first_side != previous.first_side {
+                    Some(if position.period == 0 {
+                        "Вторая половина".into()
+                    } else {
+                        "Смена сторон".into()
+                    })
+                } else {
+                    None
+                }
+            };
+            if let Some(section) = section {
+                ui.label(RichText::new(section).color(AMBER).strong());
+            }
+            let [number, winner, side, plant, reason, score] =
+                row(value, round, progress.scores[index]);
+            panel(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(
+                        RichText::new(format!("РАУНД {number}"))
+                            .color(MUTED)
+                            .strong(),
+                    );
+                    ui.label(RichText::new(score).size(26.0).strong());
+                    ui.label(
+                        RichText::new(side.as_str())
+                            .color(if side == "CT" { CT } else { AMBER })
+                            .strong(),
+                    );
+                    ui.label(RichText::new(winner).strong());
+                });
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(reason);
+                    ui.label(RichText::new(format!("Плент: {plant}")).color(MUTED));
+                    if let Some(site) = &round.result.site {
+                        ui.label(site);
                     }
-                    ui.end_row();
-                    for (index, round) in value.rounds.iter().enumerate() {
-                        let position = value.position(round.number);
-                        if index > 0 {
-                            let prior = value.position(round.number - 1);
-                            if position.period != prior.period
-                                || position.first_side != prior.first_side
-                            {
-                                let title = if position.period != prior.period {
-                                    format!("Овертайм {}", position.period)
-                                } else {
-                                    "Смена сторон".into()
-                                };
-                                ui.label(RichText::new(title).color(AMBER));
-                                ui.end_row();
-                            }
-                        }
-                        for field in row(value, round, progress.scores[index]) {
-                            ui.label(field);
-                        }
-                        if ui.small_button("Редактировать").clicked() {
-                            self.edit = Some((round.number, round.result.clone()));
-                        }
-                        ui.end_row();
+                    if ui.small_button("Редактировать").clicked() {
+                        self.edit = Some((round.number, round.result.clone()));
                     }
                 });
-        });
+                if !round.result.note.is_empty() {
+                    ui.label(RichText::new(&round.result.note).color(MUTED));
+                }
+            });
+        }
         ui.collapsing(
             "Экспорт и служебные действия",
             |ui| {
@@ -574,6 +641,15 @@ impl eframe::App for App {
                     }
                 });
             });
+        let time = ctx.input(|input| input.time);
+        if self.shown_page != self.page {
+            self.shown_page = self.page;
+            self.page_transition = time;
+        }
+        let transition = ((time - self.page_transition) / 0.15).clamp(0.0, 1.0) as f32;
+        if transition < 1.0 {
+            ctx.request_repaint();
+        }
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(BG).inner_margin(24))
             .show(ctx, |ui| {
@@ -588,12 +664,15 @@ impl eframe::App for App {
                         egui::ScrollArea::vertical()
                             .auto_shrink([false, false])
                             .show(ui, |ui| {
+                                ui.multiply_opacity(0.85 + 0.15 * transition);
                                 if !self.error.is_empty() {
                                     ui.label(RichText::new(&self.error).color(AMBER));
                                 }
                                 match self.page {
                                     Page::Home => {
-                                        ui.vertical_centered(|ui| self.home(ui));
+                                        panel(ui, |ui| {
+                                            ui.vertical_centered(|ui| self.home(ui));
+                                        });
                                     }
                                     Page::Setup => self.setup(ui),
                                     Page::History => self.history(ui),
@@ -601,27 +680,32 @@ impl eframe::App for App {
                                     Page::Round | Page::Protocol => {
                                         if let Some((_, value)) = self.current.clone() {
                                             match value.progress() {
-                                                Ok(progress) => {
-                                                    scoreboard(ui, &value, &progress);
-                                                    if self.page == Page::Round {
-                                                        centered_column(ui, 800.0, |ui| {
-                                                            egui::Frame::new()
-                                                                .fill(SURFACE)
-                                                                .corner_radius(18)
-                                                                .inner_margin(22)
-                                                                .show(ui, |ui| {
-                                                                    ui.set_min_width(
-                                                                        ui.available_width(),
-                                                                    );
-                                                                    self.round(
-                                                                        ui, &value, &progress,
-                                                                    );
-                                                                });
+                                                Ok(progress) => match self.page {
+                                                    Page::Round
+                                                        if ui.available_width() >= 910.0 =>
+                                                    {
+                                                        ui.columns(2, |columns| {
+                                                            scoreboard(
+                                                                &mut columns[0],
+                                                                &value,
+                                                                &progress,
+                                                            );
+                                                            panel(&mut columns[1], |ui| {
+                                                                self.round(ui, &value, &progress)
+                                                            });
                                                         });
-                                                    } else {
+                                                    }
+                                                    Page::Round => {
+                                                        scoreboard(ui, &value, &progress);
+                                                        panel(ui, |ui| {
+                                                            self.round(ui, &value, &progress)
+                                                        });
+                                                    }
+                                                    _ => {
+                                                        scoreboard(ui, &value, &progress);
                                                         self.protocol(ui, &value, &progress);
                                                     }
-                                                }
+                                                },
                                                 Err(error) => {
                                                     ui.label(error);
                                                 }
@@ -638,11 +722,15 @@ impl eframe::App for App {
         {
             egui::Window::new(format!("Редактировать раунд {number}"))
                 .collapsible(false)
-                .vscroll(true)
+                .fade_in(true)
+                .fade_out(true)
+                .default_width(ctx.screen_rect().width().min(680.0) * 0.92)
                 .max_height(ctx.screen_rect().height() * 0.78)
                 .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
                 .show(ctx, |ui| {
-                    edit_fields(ui, &value, number, &mut draft);
+                    egui::ScrollArea::vertical()
+                        .max_height((ctx.screen_rect().height() * 0.52).min(620.0))
+                        .show(ui, |ui| edit_fields(ui, &value, number, &mut draft));
                     self.edit = Some((number, draft.clone()));
                     if !self.error.is_empty() {
                         ui.label(RichText::new(&self.error).color(AMBER));
@@ -700,17 +788,39 @@ fn centered_column(ui: &mut Ui, width_limit: f32, content: impl FnOnce(&mut Ui))
     );
 }
 
+fn panel(ui: &mut Ui, content: impl FnOnce(&mut Ui)) {
+    egui::Frame::new()
+        .fill(SURFACE)
+        .stroke(egui::Stroke::new(1.0_f32, DIVIDER))
+        .corner_radius(14)
+        .inner_margin(16)
+        .show(ui, |ui| {
+            ui.set_min_width(ui.available_width());
+            content(ui);
+        });
+}
+
 fn primary(ui: &mut Ui, label: &str, enabled: bool) -> bool {
-    let background = if enabled { AMBER } else { RAISED };
-    let text = if enabled { BG } else { MUTED };
-    ui.add_enabled(
-        enabled,
-        egui::Button::new(RichText::new(label).color(text).size(21.0).strong())
-            .fill(background)
+    ui.scope(|ui| {
+        let visuals = ui.visuals_mut();
+        visuals.widgets.inactive.weak_bg_fill = if enabled { AMBER } else { RAISED };
+        visuals.widgets.inactive.bg_stroke = egui::Stroke::NONE;
+        visuals.widgets.hovered.weak_bg_fill = Color32::from_rgb(255, 193, 91);
+        visuals.widgets.active.weak_bg_fill = Color32::from_rgb(216, 139, 24);
+        ui.add_enabled(
+            enabled,
+            egui::Button::new(
+                RichText::new(label)
+                    .color(if enabled { BG } else { MUTED })
+                    .size(21.0)
+                    .strong(),
+            )
             .corner_radius(10)
             .min_size(egui::vec2(ui.available_width().min(280.0), 58.0)),
-    )
-    .clicked()
+        )
+        .clicked()
+    })
+    .inner
 }
 
 fn number(ui: &mut Ui, label: &str, value: &mut u32, range: std::ops::RangeInclusive<u32>) {
@@ -736,59 +846,97 @@ fn choice(ui: &mut Ui, label: impl Into<String>, selected: bool) -> bool {
     .clicked()
 }
 
-fn scoreboard(ui: &mut Ui, value: &Match, progress: &Progress) {
-    let sides = value
-        .position(if progress.finished {
-            value.next() - 1
+fn action_card(ui: &mut Ui, label: &str, selected: bool, accent: Color32) -> bool {
+    let id = ui.id().with(label);
+    let strength = ui.ctx().animate_bool_with_time(id, selected, 0.14);
+    let fill = RAISED.lerp_to_gamma(HOVER, strength);
+    ui.add(
+        egui::Button::new(RichText::new(label).strong().color(if selected {
+            accent
         } else {
-            value.next()
-        })
-        .first_side;
+            TEXT
+        }))
+        .fill(fill)
+        .stroke(egui::Stroke::new(
+            1.0_f32,
+            if selected { accent } else { DIVIDER },
+        ))
+        .min_size(egui::vec2(180.0_f32.min(ui.available_width()), 54.0))
+        .corner_radius(12),
+    )
+    .clicked()
+}
+
+fn scoreboard(ui: &mut Ui, value: &Match, progress: &Progress) {
+    let active = if progress.finished {
+        value.next() - 1
+    } else {
+        value.next()
+    };
+    let position = value.position(active);
     let score = progress.score();
-    let compact = ui.available_width() < 520.0;
-    ui.columns(2, |columns| {
-        for (index, cell) in columns.iter_mut().enumerate() {
-            egui::Frame::new()
-                .fill(RAISED)
-                .corner_radius(18)
-                .inner_margin(if compact { 12 } else { 23 })
-                .show(cell, |ui| {
-                    ui.set_min_width(ui.available_width());
-                    ui.vertical_centered(|ui| {
-                        ui.label(
-                            RichText::new(&value.teams[index].name)
-                                .size(if compact { 19.0 } else { 27.0 })
-                                .strong(),
-                        );
-                        ui.label(
-                            RichText::new(format!(
-                                "{:?}",
-                                if index == 0 { sides } else { sides.opposite() }
-                            ))
-                            .color(AMBER),
-                        );
-                        ui.label(
-                            RichText::new(score[index].to_string())
-                                .size(
-                                    (if compact { 60.0 } else { 92.0 })
-                                        + (score[index] as f32
-                                            - ui.ctx().animate_value_with_time(
-                                                ui.id().with((value.created_at, index, "score")),
-                                                score[index] as f32,
-                                                0.16,
-                                            ))
-                                        .abs()
-                                        .min(1.0)
-                                            * 4.0,
-                                )
-                                .strong()
-                                .color(TEXT),
-                        );
+    let compact = ui.available_width() < 560.0;
+    panel(ui, |ui| {
+        ui.horizontal_wrapped(|ui| {
+            ui.label(
+                RichText::new(if progress.finished {
+                    "Матч завершён"
+                } else {
+                    "Текущий счёт"
+                })
+                .strong()
+                .color(if progress.finished { SUCCESS } else { MUTED }),
+            );
+            if !value.map.is_empty() {
+                ui.label(RichText::new(&value.map).color(MUTED));
+            }
+        });
+        ui.columns(2, |columns| {
+            for (index, cell) in columns.iter_mut().enumerate() {
+                let side = if index == 0 {
+                    position.first_side
+                } else {
+                    position.first_side.opposite()
+                };
+                let ct = cell.ctx().animate_bool_with_time(
+                    cell.id().with((index, "side")),
+                    side == Side::CT,
+                    0.18,
+                );
+                let accent = AMBER.lerp_to_gamma(CT, ct);
+                egui::Frame::new()
+                    .fill(ELEVATED)
+                    .corner_radius(14)
+                    .stroke(egui::Stroke::new(1.0_f32, accent.gamma_multiply(0.60)))
+                    .inner_margin(if compact { 10 } else { 16 })
+                    .show(cell, |ui| {
+                        ui.set_min_width(ui.available_width());
+                        ui.vertical_centered(|ui| {
+                            ui.label(RichText::new(format!("{side:?}")).strong().color(accent));
+                            ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                                ui.set_min_height(if compact { 42.0 } else { 54.0 });
+                                ui.label(
+                                    RichText::new(&value.teams[index].name)
+                                        .size(if compact { 17.0 } else { 22.0 })
+                                        .strong(),
+                                );
+                            });
+                            let animated = ui.ctx().animate_value_with_time(
+                                ui.id().with((value.created_at, index, "score")),
+                                score[index] as f32,
+                                0.18,
+                            );
+                            let pulse = (score[index] as f32 - animated).abs().min(1.0);
+                            ui.label(
+                                RichText::new(score[index].to_string())
+                                    .size((if compact { 53.0 } else { 72.0 }) + pulse * 5.0)
+                                    .strong(),
+                            );
+                        });
                     });
-                });
-        }
+            }
+        });
     });
-    ui.add_space(20.0);
 }
 
 fn round_title(value: &Match, number: u32) -> String {
@@ -805,7 +953,7 @@ fn round_title(value: &Match, number: u32) -> String {
 
 fn edit_fields(ui: &mut Ui, value: &Match, number: u32, draft: &mut Draft) {
     let first_side = value.position(number).first_side;
-    ui.label("Победитель");
+    ui.label(RichText::new("Победитель").strong());
     ui.horizontal_wrapped(|ui| {
         for (index, team) in value.teams.iter().enumerate() {
             let side = if index == 0 {
@@ -813,10 +961,11 @@ fn edit_fields(ui: &mut Ui, value: &Match, number: u32, draft: &mut Draft) {
             } else {
                 first_side.opposite()
             };
-            if choice(
+            if action_card(
                 ui,
-                format!("Победа {side:?} · {}", team.name),
+                &format!("Победа {side:?} · {}", team.name),
                 draft.winner == Some(team.id),
+                if side == Side::CT { CT } else { AMBER },
             ) && draft.winner != Some(team.id)
             {
                 draft.winner = Some(team.id);
@@ -825,10 +974,20 @@ fn edit_fields(ui: &mut Ui, value: &Match, number: u32, draft: &mut Draft) {
         }
     });
     let automatic = matches!(draft.reason, Some(Reason::Explosion | Reason::Defuse));
-    ui.add_enabled(
-        !automatic,
-        egui::Checkbox::new(&mut draft.planted, "Бомба установлена"),
-    );
+    egui::Frame::new()
+        .fill(ELEVATED)
+        .corner_radius(11)
+        .inner_margin(8)
+        .stroke(egui::Stroke::new(
+            1.0_f32,
+            if draft.planted { AMBER } else { DIVIDER },
+        ))
+        .show(ui, |ui| {
+            ui.add_enabled(
+                !automatic,
+                egui::Checkbox::new(&mut draft.planted, "Бомба установлена"),
+            );
+        });
     if !draft.planted {
         draft.site = None;
     }
@@ -1061,6 +1220,9 @@ fn main() -> eframe::Result {
             visuals.widgets.inactive.weak_bg_fill = RAISED;
             visuals.widgets.inactive.bg_stroke.color = OUTLINE;
             visuals.widgets.hovered.bg_stroke.color = FOCUS;
+            visuals.widgets.hovered.weak_bg_fill = HOVER;
+            visuals.widgets.active.weak_bg_fill = Color32::from_rgb(216, 139, 24);
+            visuals.widgets.noninteractive.bg_stroke.color = DIVIDER;
             visuals.selection.bg_fill = Color32::from_rgb(109, 72, 22);
             visuals.selection.stroke.color = AMBER;
             cc.egui_ctx.set_visuals(visuals);
@@ -1108,6 +1270,8 @@ fn main() -> eframe::Result {
                 path: String::new(),
                 export_folder: export_folder.map(PathBuf::from),
                 settings_back: Page::Home,
+                shown_page: Page::Home,
+                page_transition: -1.0,
                 emblem,
                 fullscreen: false,
             };

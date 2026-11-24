@@ -1,6 +1,10 @@
 package app.scoretab
 
 import android.os.Bundle
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.window.DialogProperties
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
@@ -50,7 +54,7 @@ internal val text = Color(0xFFF1F7FB)
 internal val muted = Color(0xFF9CAEBB)
 private val palette = darkColorScheme(primary = amber, onPrimary = background, background = background,
     onBackground = text, surface = surface, onSurface = text, surfaceVariant = raised,
-    onSurfaceVariant = muted, outline = Color(0xFF526A79))
+    onSurfaceVariant = muted, outline = Color(0xFF526A79), outlineVariant = divider, error = danger)
 
 class MainActivity : ComponentActivity() {
     private val viewModel: ScoreViewModel by viewModels()
@@ -126,8 +130,14 @@ private fun ScoreApp(vm: ScoreViewModel) {
     Surface(color = background, modifier = Modifier.fillMaxSize()) {
         Column(Modifier.safeDrawingPadding().imePadding().fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             BrandHeader(if (screen == "home") null else { { screen = "home" } })
+            val pageOpacity = remember { Animatable(1f) }
+            LaunchedEffect(screen) {
+                pageOpacity.snapTo(.88f)
+                pageOpacity.animateTo(1f, tween(150))
+            }
             val screenScroll = rememberSaveable(screen, saver = ScrollState.Saver) { ScrollState(0) }
             Column(Modifier.widthIn(max = 800.dp).fillMaxWidth().verticalScroll(screenScroll)
+                .graphicsLayer { alpha = pageOpacity.value }
                 .padding(horizontal = 18.dp, vertical = 22.dp), verticalArrangement = Arrangement.spacedBy(15.dp),
                 horizontalAlignment = Alignment.CenterHorizontally) {
                 if (model.error.isNotEmpty()) Text(model.error, color = amber)
@@ -151,39 +161,58 @@ private fun ScoreApp(vm: ScoreViewModel) {
                     }
                     "settings" -> {
                         Text("Настройки", style = MaterialTheme.typography.headlineMedium)
-                        Text("Папка для экспорта", style = MaterialTheme.typography.titleMedium)
-                        Text(model.exportFolder ?: "Папка не выбрана")
-                        Text("CSV, Excel и JSON сохраняются сюда автоматически.", color = muted)
-                        Button(onClick = { chooseFolder.launch(null) }, enabled = !model.busy,
-                            modifier = Modifier.heightIn(min = 55.dp)) { Text("Выбрать папку") }
+                        Panel {
+                            Section("Папка для экспорта")
+                            Text(model.exportFolder ?: "Папка не выбрана")
+                            Text("CSV, Excel и JSON сохраняются сюда автоматически.", color = muted)
+                            Button(onClick = { chooseFolder.launch(null) }, enabled = !model.busy,
+                                modifier = Modifier.heightIn(min = 55.dp)) { Text("Выбрать папку") }
+                        }
                         OutlinedButton(onClick = { screen = settingsBack }) { Text("Назад") }
                     }
                     "history" -> {
                         Text("История матчей", style = MaterialTheme.typography.headlineMedium)
-                        if (model.matches.isEmpty()) Text("Матчей пока нет.")
+                        if (model.matches.isEmpty()) Panel { Text("Матчей пока нет.", color = muted) }
                         for (entry in model.matches) {
                             val game = entry.match
                             val status = game.progress()
-                            Card(colors = CardDefaults.cardColors(containerColor = raised)) {
-                                Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                                    Text(game.scoreText(status), style = MaterialTheme.typography.titleMedium)
-                                    Text(listOf(game.map, date(game.createdAt),
-                                        if (status.finished) "Завершён" else "Продолжается").filter(String::isNotBlank).joinToString(" · "), color = muted)
-                                    FlowButtons {
-                                        TextButton(onClick = { open(entry) }) { Text("Открыть") }
-                                        TextButton(onClick = { deleteId = entry.id }) { Text("Удалить") }
-                                    }
+                            Panel {
+                                val statusColor = if (status.finished) success else ct
+                                Text(if (status.finished) "Завершён" else "Продолжается", color = statusColor)
+                                Section(game.scoreText(status))
+                                Text(listOf(game.map, date(game.createdAt)).filter(String::isNotBlank).joinToString(" · "), color = muted)
+                                FlowButtons {
+                                    OutlinedButton(onClick = { open(entry) }, shape = RoundedCornerShape(12.dp)) { Text("Открыть") }
+                                    TextButton(onClick = { deleteId = entry.id }) { Text("Удалить", color = danger) }
                                 }
                             }
                         }
                     }
                     "match", "protocol" -> if (stored != null && progress != null) {
-                        Scoreboard(stored.match, progress)
-                        if (model.notice.isNotEmpty()) Text(model.notice, color = amber)
                         if (screen == "protocol" || progress.finished) {
+                            Scoreboard(stored.match, progress)
+                            if (model.notice.isNotEmpty()) Text(model.notice, color = amber)
                             Protocol(vm, model, stored, progress, services, { services = it }, openSettings = ::openSettings) { screen = "match" }
                         } else {
-                            LiveRound(vm, model, stored) { screen = "protocol" }
+                            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                                if (maxWidth >= 690.dp) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                        Column(Modifier.weight(.85f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Scoreboard(stored.match, progress)
+                                            if (model.notice.isNotEmpty()) Text(model.notice, color = amber)
+                                        }
+                                        Column(Modifier.weight(1.15f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            LiveRound(vm, model, stored) { screen = "protocol" }
+                                        }
+                                    }
+                                } else {
+                                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        Scoreboard(stored.match, progress)
+                                        if (model.notice.isNotEmpty()) Text(model.notice, color = amber)
+                                        LiveRound(vm, model, stored) { screen = "protocol" }
+                                    }
+                                }
+                            }
                         }
                     } else if (model.busy || model.error.isEmpty()) {
                         CircularProgressIndicator()
@@ -234,21 +263,20 @@ private fun LiveRound(vm: ScoreViewModel, model: Model, stored: StoredMatch, pro
     val value = stored.match
     val number = value.next
     val position = value.position(number)
-    Text("Раунд $number", style = MaterialTheme.typography.headlineMedium)
-    if (position.period > 0) Text("Овертайм ${position.period} · Раунд ${position.number}", color = amber)
     var raw by rememberSaveable(stored.id, number) { mutableStateOf(protocolJson.encodeToString(value.draft)) }
     val draft = remember(raw) { protocolJson.decodeFromString<Draft>(raw) }
-    Card(Modifier.widthIn(max = 620.dp).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = surface)) {
-        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            RoundFields(value, number, draft) {
-                raw = protocolJson.encodeToString(it)
-                vm.saveDraft(stored.id, number, it)
-            }
+    Panel {
+        Text("Раунд $number", style = MaterialTheme.typography.headlineMedium)
+        if (position.period > 0) Text("Овертайм ${position.period} · Раунд ${position.number}", color = amber)
+        RoundFields(value, number, draft) {
+            raw = protocolJson.encodeToString(it)
+            vm.saveDraft(stored.id, number, it)
         }
     }
     val valid = runCatching { value.normalize(number, draft) }
     if (draft.winner != null && draft.reason != null) valid.exceptionOrNull()?.message?.let { Text(it, color = amber) }
     Button(onClick = { vm.commit(stored.id, number, draft) }, enabled = valid.isSuccess && !model.busy,
+        shape = RoundedCornerShape(14.dp),
         modifier = Modifier.widthIn(max = 620.dp).fillMaxWidth().heightIn(min = 62.dp)) { Text("Следующий раунд") }
     OutlinedButton(onClick = protocol, modifier = Modifier.widthIn(max = 620.dp).fillMaxWidth().heightIn(min = 54.dp)) { Text("Протокол матча") }
 }
@@ -277,23 +305,29 @@ private fun Protocol(vm: ScoreViewModel, model: Model, stored: StoredMatch, prog
         OutlinedButton(onClick = { clipboard.setText(AnnotatedString(value.scoreText(progress))) }) { Text("Копировать счёт") }
         OutlinedButton(onClick = { clipboard.setText(AnnotatedString(value.protocolText(progress))) }) { Text("Копировать протокол") }
     }
+    if (value.rounds.isEmpty()) Panel { Text("Завершённые раунды появятся здесь.", color = muted) }
     for ((index, round) in value.rounds.withIndex()) {
         val position = value.position(round.number)
-        val previous = if (index == 0) null else value.position(round.number - 1)
-        if (previous != null && position.period != previous.period) Text("Овертайм ${position.period}", color = amber)
-        if (previous != null && position.firstSide != previous.firstSide) Text("Смена сторон", color = amber)
+        val previous = value.rounds.getOrNull(index - 1)?.let { value.position(it.number) }
+        val group = when {
+            previous == null -> "Первая половина"
+            position.period != previous.period -> "Овертайм ${position.period}"
+            position.firstSide != previous.firstSide -> if (position.period == 0) "Вторая половина" else "Смена сторон"
+            else -> null
+        }
+        if (group != null) Text(group, color = amber, style = MaterialTheme.typography.titleMedium)
         val fields = value.roundFields(round, progress.scores[index])
-        Card(colors = CardDefaults.cardColors(containerColor = raised)) {
-            Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                Text("Раунд ${fields[0]} · ${fields[5]}", style = MaterialTheme.typography.titleMedium)
-                Text("${fields[1]} (${fields[2]}) · ${fields[4]} · Плент: ${fields[3]}")
-                if (fields[6].isNotEmpty()) Text("Позиция ${fields[6]}")
-                if (fields[7].isNotEmpty()) Text(fields[7])
-                TextButton(onClick = {
-                    editNumber = round.number
-                    editDraft = protocolJson.encodeToString(round.result)
-                }) { Text("Редактировать") }
-            }
+        Panel {
+            Text("Раунд ${fields[0]} · ${fields[5]}", style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold)
+            Text("${fields[1]} (${fields[2]}) · ${fields[4]} · Плент: ${fields[3]}",
+                color = if (fields[2] == "CT") ct else amber)
+            if (fields[6].isNotEmpty()) Text("Позиция ${fields[6]}", color = muted)
+            if (fields[7].isNotEmpty()) Text(fields[7], color = muted)
+            TextButton(onClick = {
+                editNumber = round.number
+                editDraft = protocolJson.encodeToString(round.result)
+            }) { Text("Редактировать") }
         }
     }
     OutlinedButton(onClick = { setServices(!services) }) { Text("Экспорт и служебные действия") }
@@ -327,6 +361,9 @@ private fun Protocol(vm: ScoreViewModel, model: Model, stored: StoredMatch, prog
         val draft = remember(editDraft) { protocolJson.decodeFromString<Draft>(editDraft) }
         val invalid = runCatching { value.normalize(editNumber, draft) }.exceptionOrNull()?.message
         AlertDialog(onDismissRequest = { if (!model.busy) editNumber = 0 },
+            modifier = Modifier.widthIn(max = 660.dp).fillMaxWidth(.94f),
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            shape = RoundedCornerShape(20.dp), containerColor = surface,
             title = { Text("Редактировать раунд $editNumber") },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
